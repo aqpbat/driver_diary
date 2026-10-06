@@ -118,7 +118,7 @@ docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 
 - [x] 0.1 `git init`, корневой `.gitignore` (`.DS_Store`, `.env`, артефакты сборки Go)
 - [x] 0.2 Проверить, что `mobile/android/local.properties` и `.idea/` не попадают в индекс
-- [ ] 0.3 Публичный репозиторий на GitHub, первый коммит со скелетом
+- [x] 0.3 Публичный репозиторий на GitHub, первый коммит со скелетом
 - [x] 0.4 Завести `docs/ai-notes.md` и вести по ходу работы: что спросили у ИИ, где он ошибся, что исправлено руками (нужно для анкеты — задним числом не восстановить)
 
 ### A. Данные и контракт
@@ -176,7 +176,7 @@ docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 - [x] E1 `api/Dockerfile`, две стадии: сборка на `golang:1.26.8-alpine3.24`, запуск на `distroless/static-debian13` (nonroot); оба базовых образа — точный тег + `@sha256:` (сверить существование тегов при реализации); `CGO_ENABLED=0`, `-trimpath`
 - [x] E2 `api/.dockerignore`
 - [x] E3 `docker-compose.yml` (лежит в корне: `db` + `api`, образ Postgres зафиксирован тегом и digest) — проверить `docker compose up --build`: оба сервиса `healthy`, `curl localhost:8080/api/v1/days`; после `docker compose restart` добавленная поездка на месте; `docker compose down -v` возвращает начальные данные
-- [x] E4 Railway: сервис API из репозитория, Root Directory = `api`; `api/railway.json` — сборка из Dockerfile, `healthcheckPath: /healthz`; рядом — сервис PostgreSQL из шаблона Railway; в API переменная `DATABASE_URL=${{Postgres.DATABASE_URL}}` (внутренняя сеть), плюс `APP_TZ`, `CORS_ALLOWED_ORIGINS`; сверить мажорную версию Postgres на Railway с локальной. **Сделано иначе:** репозитория на GitHub ещё нет, поэтому сервис выкатывается загрузкой каталога — `railway up --service api` из `api/`; Root Directory не задан, `railway.json` подхватывается из корня загрузки. После 0.3 можно подключить репозиторий (тогда Root Directory = `api`, путь к конфигу `/api/railway.json`). `CORS_ALLOWED_ORIGINS=*` — сузить до адреса демо в E5
+- [x] E4 Railway: сервис API из репозитория, Root Directory = `api`; `api/railway.json` — сборка из Dockerfile, `healthcheckPath: /healthz`; рядом — сервис PostgreSQL из шаблона Railway; в API переменная `DATABASE_URL=${{Postgres.DATABASE_URL}}` (внутренняя сеть), плюс `APP_TZ`, `CORS_ALLOWED_ORIGINS`; сверить мажорную версию Postgres на Railway с локальной. **Как настроено:** сервис `api` подключён к `aqpbat/driver_diary`, ветка `main`, Root Directory `/api` — пуш в `main` запускает деплой. Проверка `/healthz`, таймаут и политика перезапуска заданы в настройках сервиса: указать путь к `railway.json` Railway уже не даёт (формат устарел, файлы работают до 2026-12-01). `CORS_ALLOWED_ORIGINS=*` — сузить до адреса демо в E5
 - [ ] E5 Демо: `flutter build web --dart-define=API_BASE_URL=<railway-url>` → GitHub Pages; не забыть `--base-href`
 - [ ] E6 CI (GitHub Actions, версии действий и инструментов зафиксированы): `go vet`, `go test -race` с сервисным контейнером Postgres той же версии и `TEST_DATABASE_URL`, `flutter analyze`, `flutter test`
 
