@@ -135,7 +135,6 @@ void main() {
       isA<AddTripEditing>().having((s) => s.errors, 'errors', {
         TripField.end: TripFieldError.endNotAfterStart,
         TripField.amount: TripFieldError.notPositive,
-        TripField.commission: TripFieldError.required,
       }),
     ],
     verify: (_) => verifyNever(() => addTrip(any())),
@@ -212,7 +211,13 @@ void main() {
       expect(cubit.state.commissionEdited, isTrue);
     });
 
-    test('is empty while the amount is not a positive number', () {
+    test('is zero for a zero amount: one mistake, not two', () {
+      final cubit = build()..amountChanged('0');
+
+      expect(cubit.state.form.commissionText, '0');
+    });
+
+    test('is empty while there is no amount', () {
       final cubit = build()..amountChanged('2400');
 
       cubit.amountChanged('');

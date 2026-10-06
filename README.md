@@ -2,7 +2,85 @@
 
 Тестовое задание: сервер отдаёт поездки водителя и сводку за день, клиент показывает сводку и список поездок, переключает дни и добавляет поездки.
 
-**Состояние:** готовы сервер (домен, хранилище на PostgreSQL, HTTP API, Docker-образ) и клиент на Flutter (Android, iOS, Web) — всё с тестами. API развёрнут на Railway: https://api-production-ab4d.up.railway.app (например, [`/api/v1/days`](https://api-production-ab4d.up.railway.app/api/v1/days)). Впереди — демо-сборка клиента и CI; план и чеклист — в [PLAN.md](PLAN.md).
+**Состояние:** готовы сервер (домен, хранилище на PostgreSQL, HTTP API, Docker-образ) и клиент на Flutter (Android, iOS, Web) — всё с тестами. API развёрнут на Railway: https://api-production-ab4d.up.railway.app (например, [`/api/v1/days`](https://api-production-ab4d.up.railway.app/api/v1/days)). Попробовать без установки чего-либо — раздел [«Посмотреть без установки»](#посмотреть-без-установки). Впереди — CI; план и чеклист — в [PLAN.md](PLAN.md).
+
+## Как это выглядит
+
+| День со сводкой | Пустой день | Новая поездка | Ошибки в форме |
+|---|---|---|---|
+| <img src="docs/screenshots/day-light.png" width="230" alt="День: сумма на руки, выручка, комиссия, разбивка на наличные и карту, список поездок"> | <img src="docs/screenshots/empty-light.png" width="230" alt="День без поездок"> | <img src="docs/screenshots/form-light.png" width="230" alt="Форма добавления поездки"> | <img src="docs/screenshots/form-invalid-light.png" width="230" alt="Форма с ошибками проверки у полей"> |
+| <img src="docs/screenshots/day-dark.png" width="230" alt="День со сводкой, тёмная тема"> | <img src="docs/screenshots/empty-dark.png" width="230" alt="День без поездок, тёмная тема"> | <img src="docs/screenshots/form-dark.png" width="230" alt="Форма добавления поездки, тёмная тема"> | <img src="docs/screenshots/form-invalid-dark.png" width="230" alt="Форма с ошибками проверки, тёмная тема"> |
+
+| Загрузка | Нет связи | Повтор отправки |
+|---|---|---|
+| <img src="docs/screenshots/loading-light.png" width="230" alt="Скелетон на время загрузки дня"> | <img src="docs/screenshots/error-light.png" width="230" alt="Ошибка сети с кнопкой «Повторить»"> | <img src="docs/screenshots/form-retry-light.png" width="230" alt="Форма после ошибки сети: повтор не создаст дубль"> |
+| <img src="docs/screenshots/loading-dark.png" width="230" alt="Скелетон, тёмная тема"> | <img src="docs/screenshots/error-dark.png" width="230" alt="Ошибка сети, тёмная тема"> | <img src="docs/screenshots/form-retry-dark.png" width="230" alt="Повтор отправки, тёмная тема"> |
+
+Тема выбирается по настройке системы. Скриншоты — настоящие экраны приложения с данными, которые сервер отдаёт за 5 октября из начального набора; они пересоздаются командой `flutter test --update-goldens tool/screenshots_test.dart` из каталога `mobile/`.
+
+## Посмотреть без установки
+
+Не нужны ни Flutter, ни Go, ни Docker: в репозитории лежит уже собранный веб-клиент, а сервер работает на Railway. Нужны только браузер и интернет.
+
+1. Скачайте репозиторий: на странице GitHub кнопка **Code → Download ZIP**, затем распакуйте архив.
+2. В папке `demo` запустите один файл:
+   - **macOS** — двойной щелчок по `start.command`;
+   - **Windows** — двойной щелчок по `start.bat`;
+   - **Linux** — `sh demo/start.command` в терминале.
+3. Откроется Chrome (или браузер по умолчанию) с приложением. Чтобы остановить, закройте окно со скриптом.
+
+Если macOS не даёт открыть `start.command` («не удалось проверить разработчика»): щёлкните по файлу правой кнопкой → «Открыть», либо разрешите запуск в «Системные настройки → Конфиденциальность и безопасность». Запасной путь — перетащить файл в окно «Терминала», дописав перед ним `sh `, и нажать Enter.
+
+Что делает файл: поднимает на вашем компьютере маленький веб-сервер, который отдаёт папку `demo/web` по адресу `http://localhost:8765`, и открывает этот адрес. Наружу он недоступен, ничего не устанавливает и не меняет. На macOS и Linux используется встроенный Python 3 или Ruby, на Windows — встроенный PowerShell.
+
+Данные общие: поездка, добавленная в демо, сохраняется в базе на Railway, и её увидят все, кто откроет демо после вас.
+
+## Быстрый старт для разработчика
+
+Сервер и база поднимаются локально в Docker, клиент запускается в отладке на симуляторе.
+
+Понадобятся: Docker, Flutter 3.47.5, Xcode с симулятором iOS (или Android Studio с эмулятором) и VS Code с расширением Flutter.
+
+1. Склонируйте репозиторий и поднимите сервер с базой:
+
+   ```sh
+   git clone https://github.com/aqpbat/driver_diary.git
+   cd driver_diary
+   docker compose up --build -d
+   ```
+
+2. Убедитесь, что сервер отвечает. Порты заданы в [docker-compose.yml](docker-compose.yml), их же показывает `docker compose ps`:
+
+   | Сервис | Адрес на вашей машине | Зачем |
+   |---|---|---|
+   | `api` | `http://localhost:8080` | сюда ходит клиент |
+   | `db` | `127.0.0.1:5432`, база, пользователь и пароль — `diary` | посмотреть данные, запустить тесты хранилища |
+
+   ```sh
+   curl http://localhost:8080/healthz          # {"status":"ok"}
+   curl http://localhost:8080/api/v1/days      # четыре дня из начальных данных
+   ```
+
+3. Запустите симулятор и подтяните зависимости клиента:
+
+   ```sh
+   open -a Simulator
+   cd mobile && flutter pub get
+   ```
+
+4. Откройте корень репозитория в VS Code, в панели «Run and Debug» выберите конфигурацию и нажмите F5. Адрес сервера в каждую конфигурацию уже вписан:
+
+   | Где запускаете | Конфигурация в VS Code | Адрес сервера для клиента |
+   |---|---|---|
+   | симулятор iOS | `iOS (sim) -> local API` | `http://localhost:8080` |
+   | эмулятор Android | `Android (emu) -> local API` | `http://10.0.2.2:8080` — так эмулятор видит вашу машину |
+   | Chrome | `Chrome -> local API` | `http://localhost:8080` |
+
+   То же из терминала — `flutter run --dart-define=API_BASE_URL=<адрес из таблицы>` в каталоге `mobile/`.
+
+5. Закончив, остановите сервер: `docker compose down`. С ключом `-v` база вернётся к начальным данным.
+
+Подробности — в разделах ниже.
 
 ## Запуск сервера
 
@@ -51,13 +129,24 @@ flutter run --dart-define=API_BASE_URL=https://api-production-ab4d.up.railway.ap
 | `API_BASE_URL` | `http://localhost:8080` | адрес API |
 | `DRIVER_UTC_OFFSET` | `+05:00` | смещение часов водителя; должно совпадать с `APP_TZ` сервера. С ним форма отправляет время поездки, по нему считается «сегодня» — часы устройства не используются |
 
-В VS Code то же самое доступно из панели «Run and Debug»: готовые конфигурации запуска лежат в [.vscode/launch.json](.vscode/launch.json) — клиент в Chrome, на эмуляторе Android и симуляторе iOS с локальным API, клиент с сервером на Railway (локальный сервер не нужен) и сам сервер под отладчиком Go.
+В VS Code то же самое доступно из панели «Run and Debug»: готовые конфигурации запуска лежат в [.vscode/launch.json](.vscode/launch.json). Кроме трёх из быстрого старта там есть `Chrome -> Railway` и `Chosen -> Railway` (клиент с развёрнутым сервером, локальный не нужен; вторая — для выбранного устройства, в том числе настоящего телефона) и `API: сервер (Go)` — сервер под отладчиком.
 
 Открытый HTTP разрешён только для разработки: на Android — в debug-манифесте, на iOS — только к локальной сети (`NSAllowsLocalNetworking`).
 
 Экран компонентов дизайн-системы открывается долгим нажатием на заголовок с датой — только в debug-сборке.
 
 Клиент устроен по Clean Architecture с делением по фичам и `flutter_bloc`, без Material: правила — в [PLAN.md](PLAN.md), раздел 3.1; их соблюдение проверяет `mobile/test/architecture_test.dart`.
+
+### Демо-сборка
+
+`demo/web/` — результат `flutter build web` с адресом сервера на Railway, без каталога `canvaskit` (движок отрисовки страница берёт с CDN Google). После изменений в клиенте сборку нужно обновить и закоммитить:
+
+```sh
+sh demo/build.sh                                        # сервер на Railway
+API_BASE_URL=http://localhost:8080 sh demo/build.sh     # другой сервер
+```
+
+Сервер должен разрешать CORS для `http://localhost:8765`–`8769` — с этих адресов открывается демо.
 
 ## Тесты
 

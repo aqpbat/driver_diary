@@ -14,6 +14,7 @@ Future<void> pumpApp(
   return tester.pumpWidget(
     WidgetsApp(
       color: theme.colors.accent,
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         DefaultCupertinoLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,

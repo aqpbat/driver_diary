@@ -1,0 +1,5 @@
+# Launchers must keep their line endings on every platform: cmd.exe needs
+# CRLF, sh breaks on it.
+demo/start.bat text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf

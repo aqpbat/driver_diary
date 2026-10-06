@@ -1,6 +1,6 @@
 # Дневник смен водителя — план реализации
 
-Статус: этапы 1–4 готовы. Сервер (домен, PostgreSQL, HTTP API, Docker, Railway: https://api-production-ab4d.up.railway.app) и клиент (дизайн-система, данные, экраны, тесты) реализованы. Остались демо на GitHub Pages (E5), CI (E6) и сдача (J).
+Статус: этапы 1–4 готовы. Сервер (домен, PostgreSQL, HTTP API, Docker, Railway: https://api-production-ab4d.up.railway.app) и клиент (дизайн-система, данные, экраны, тесты) реализованы. Демо — готовая web-сборка в `demo/` с файлом запуска. Остались CI (E6) и сдача (J).
 
 ## 1. Решения
 
@@ -22,7 +22,7 @@
 
 1. **Поля ввода.** «Движок» — `CupertinoTextField` с отключённым оформлением (`decoration: null`); рамка, подпись, ошибка и суффикс нарисованы своими компонентами. `package:flutter/cupertino.dart` импортируется только в `lib/core/design/` (поле ввода, обновление потягиванием) и в `lib/app/app.dart` (локализация меню выделения) — это проверяет `test/architecture_test.dart`.
 2. **Комиссия в форме.** Отдельное поле; пока водитель его не трогал, подставляется 15 % от суммы с округлением до тенге. После ручной правки подстановка отключается.
-3. **Демо.** Не делалось — блок E5 впереди.
+3. **Демо.** Сделано не на GitHub Pages, а готовой сборкой в репозитории с файлом запуска — см. E5.
 
 Решения, которых в плане не было:
 
@@ -97,6 +97,8 @@ mobile/lib/
       presentation/         bloc, pages, widgets
     add_trip/               форма добавления
       domain/  data/  presentation/
+demo/                       готовая web-сборка клиента (web/) и файлы запуска: start.command, start.bat, build.sh
+docs/                       ai-notes.md, screenshots/ для README
 docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 ```
 
@@ -185,7 +187,7 @@ docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 - [x] E2 `api/.dockerignore`
 - [x] E3 `docker-compose.yml` (лежит в корне: `db` + `api`, образ Postgres зафиксирован тегом и digest) — проверить `docker compose up --build`: оба сервиса `healthy`, `curl localhost:8080/api/v1/days`; после `docker compose restart` добавленная поездка на месте; `docker compose down -v` возвращает начальные данные
 - [x] E4 Railway: сервис API из репозитория, Root Directory = `api`; `api/railway.json` — сборка из Dockerfile, `healthcheckPath: /healthz`; рядом — сервис PostgreSQL из шаблона Railway; в API переменная `DATABASE_URL=${{Postgres.DATABASE_URL}}` (внутренняя сеть), плюс `APP_TZ`, `CORS_ALLOWED_ORIGINS`; сверить мажорную версию Postgres на Railway с локальной. **Как настроено:** сервис `api` подключён к `aqpbat/driver_diary`, ветка `main`, Root Directory `/api` — пуш в `main` запускает деплой. Проверка `/healthz`, таймаут и политика перезапуска заданы в настройках сервиса: указать путь к `railway.json` Railway уже не даёт (формат устарел, файлы работают до 2026-12-01). `CORS_ALLOWED_ORIGINS=*` — сузить до адреса демо в E5
-- [ ] E5 Демо: `flutter build web --dart-define=API_BASE_URL=<railway-url>` → GitHub Pages; не забыть `--base-href`
+- [x] E5 Демо без установки: собранный web-клиент с адресом Railway лежит в `demo/web/`, запускается одним файлом — `demo/start.command` (macOS, Linux) или `demo/start.bat` (Windows); пересборка — `demo/build.sh`. **Вместо GitHub Pages:** так решено при подготовке к публикации. `CORS_ALLOWED_ORIGINS` на Railway остаётся `*` (или `http://localhost:8765`–`8769`): демо открывается с локального адреса
 - [ ] E6 CI (GitHub Actions, версии действий и инструментов зафиксированы): `go vet`, `go test -race` с сервисным контейнером Postgres той же версии и `TEST_DATABASE_URL`, `flutter analyze`, `flutter test`
 
 ### F. Клиент: дизайн-система
@@ -236,7 +238,7 @@ docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 ### J. Сдача
 
 - [ ] J1 README: что это, как запустить (compose, клиент на эмуляторе и в браузере), как запустить тесты, контракт API, принятые допущения (раздел 1), архитектура клиента (раздел 3.1), как сбросить базу к начальным данным
-- [ ] J2 Скриншоты: день со сводкой, пустой день, форма, ошибка проверки; светлая и тёмная тема
+- [x] J2 Скриншоты: день со сводкой, пустой день, форма, ошибка проверки; светлая и тёмная тема. Лежат в `docs/screenshots/`, показаны в README, пересоздаются из `mobile/tool/screenshots_test.dart`
 - [ ] J3 Раздел «Как использовался ИИ» из `docs/ai-notes.md`
 - [ ] J4 Прогон с нуля на чистом клоне: `docker compose up --build`, тесты, клиент
 - [ ] J5 Проверить Railway: `curl` на `/healthz`, `/days`, повторный `POST` → `200`

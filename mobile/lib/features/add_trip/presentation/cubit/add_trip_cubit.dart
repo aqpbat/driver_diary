@@ -50,8 +50,10 @@ class AddTripCubit extends Cubit<AddTripState> {
     var form = state.form.copyWith(amountText: text);
     if (!state.commissionEdited) {
       final amount = parseAmount(text);
+      // A zero or negative amount gets "0", so that the form reports one
+      // mistake (the amount), not two.
       form = form.copyWith(
-        commissionText: amount == null || amount <= 0
+        commissionText: amount == null
             ? ''
             : suggestedCommission(amount).toString(),
       );

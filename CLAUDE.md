@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Driver shift diary" — a take-home test assignment. A server exposes a driver's trips and a per-day summary; a client shows the summary and trip list, switches days, and adds trips.
 
-**Current state: stages 1–4 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; `api/Dockerfile`, `api/.dockerignore` and `api/railway.json` exist, the compose stack is verified, and the API runs on Railway at https://api-production-ab4d.up.railway.app (project `driver-diary`, services `api` and `Postgres`). The Flutter client in `mobile/` is implemented and tested (design system, data layer, day screen, add-trip form). Not done yet: the web demo (E5), CI (E6) and the hand-in tasks (J). [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed.
+**Current state: stages 1–4 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; `api/Dockerfile`, `api/.dockerignore` and `api/railway.json` exist, the compose stack is verified, and the API runs on Railway at https://api-production-ab4d.up.railway.app (project `driver-diary`, services `api` and `Postgres`). The Flutter client in `mobile/` is implemented and tested (design system, data layer, day screen, add-trip form). The no-install demo is a committed web build in `demo/web/` started by `demo/start.command` / `demo/start.bat`. Not done yet: CI (E6) and the hand-in tasks (J). [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed.
 
 The user communicates in Russian; README and PLAN are written in Russian.
 
@@ -20,7 +20,8 @@ flutter analyze
 flutter test                                  # all tests
 flutter test test/path/to_test.dart           # one file
 flutter test --plain-name "substring"         # one test by name
-dart format lib test
+dart format lib test tool
+flutter test --update-goldens tool/screenshots_test.dart   # re-render docs/screenshots/ for the README (kept outside test/ on purpose)
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080    # Android emulator
 flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
 ```
@@ -72,6 +73,12 @@ Rules that span these layers and are easy to get wrong:
 - The runtime image is distroless (no shell); the container healthcheck is the binary's own `-healthcheck` flag. `docker-compose.yml` already depends on this and on the binary living at `/server`.
 - The image carries the seed at `/data/trips.json` (`TRIPS_FILE` is set in the Dockerfile); compose mounts its own copy over it. `api/.dockerignore` is an allow-list — a new top-level directory under `api/` must be added there and to the Dockerfile's `COPY` lines.
 - Railway: service `api` is connected to GitHub `aqpbat/driver_diary`, branch `main`, Root Directory `/api` — a push to `main` deploys. Health check path, timeout and restart policy are set in the service settings (the API rejects a custom `railway.json` path as deprecated; do not rely on `api/railway.json` being read). The CLI lives at `~/.railway/bin/railway`. Go build artifacts are ignored in `api/.gitignore`, not the root one: `railway up` from `api/` misread the root pattern `/api/server` and dropped `cmd/server` from the upload; the server must bind `0.0.0.0:$PORT`; `DATABASE_URL` references the Railway Postgres service.
+
+### Demo (`demo/`)
+
+- `demo/web/` is build output committed on purpose (`flutter build web` against the Railway API, without `canvaskit/` — the page loads it from Google's CDN). Never edit it by hand; after any client change run `sh demo/build.sh` and commit the result, otherwise the demo shows a stale client.
+- `demo/start.command` (macOS/Linux, POSIX `sh`) and `demo/start.bat` (Windows, a batch file that runs the PowerShell below its `#PS1` line) serve that folder on `localhost:8765`–`8769`. They must work with what the OS ships: no Node, no Flutter, no extra installs. Line endings are pinned in `.gitattributes`. `start.bat` has never been run on Windows — there is no Windows machine or PowerShell here.
+- The demo's origin is `http://localhost:<port>`, so `CORS_ALLOWED_ORIGINS` on Railway must keep allowing it (`*` today).
 
 ### Mobile (`mobile/`)
 
