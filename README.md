@@ -2,11 +2,20 @@
 
 Тестовое задание: сервер отдаёт поездки водителя и сводку за день, клиент показывает сводку и список поездок, переключает дни и добавляет поездки.
 
-**Состояние:** готов бэкенд — домен, хранилище на PostgreSQL и HTTP API, всё с тестами. Docker-образ, деплой и клиент — в работе, план и чеклист — в [PLAN.md](PLAN.md).
+**Состояние:** готов бэкенд — домен, хранилище на PostgreSQL и HTTP API, всё с тестами, — и его Docker-образ. API развёрнут на Railway: https://api-production-ab4d.up.railway.app (например, [`/api/v1/days`](https://api-production-ab4d.up.railway.app/api/v1/days)). Клиент — в работе, план и чеклист — в [PLAN.md](PLAN.md).
 
 ## Запуск сервера
 
-Нужны Go 1.26 и Docker (для PostgreSQL).
+Всё в Docker (нужен только Docker):
+
+```sh
+docker compose up --build     # PostgreSQL + API на http://localhost:8080
+docker compose down -v        # остановить и сбросить базу к начальным данным
+```
+
+Добавленные поездки лежат в томе `pgdata` и переживают `docker compose restart` и пересборку образа. Начальные данные загружаются только в пустую базу.
+
+Без контейнера для API — нужны Go 1.26 и Docker (для PostgreSQL):
 
 ```sh
 docker compose up -d db

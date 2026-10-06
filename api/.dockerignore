@@ -1,0 +1,10 @@
+# Allow-list: the image is built from the module files, the sources and the seed.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!data/trips.json
+
+**/*_test.go
+**/.DS_Store

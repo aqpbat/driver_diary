@@ -1,6 +1,6 @@
 # Дневник смен водителя — план реализации
 
-Статус: этапы 1 и 2 готовы (репозиторий, данные, домен, хранилище на PostgreSQL, HTTP API — всё с тестами). Dockerfile и деплоя ещё нет, `mobile/` — чистый шаблон Flutter.
+Статус: этапы 1 и 2 готовы (репозиторий, данные, домен, хранилище на PostgreSQL, HTTP API — всё с тестами); этап 3 готов (Docker-образ, compose, деплой на Railway: https://api-production-ab4d.up.railway.app). `mobile/` — чистый шаблон Flutter.
 
 ## 1. Решения
 
@@ -173,10 +173,10 @@ docker-compose.yml  PLAN.md  README.md  CLAUDE.md  .github/workflows/ci.yml
 
 ### E. Инфраструктура
 
-- [ ] E1 `api/Dockerfile`, две стадии: сборка на `golang:1.26.8-alpine`, запуск на `distroless/static` (nonroot); оба базовых образа — точный тег + `@sha256:` (сверить существование тегов при реализации); `CGO_ENABLED=0`, `-trimpath`
-- [ ] E2 `api/.dockerignore`
-- [ ] E3 `docker-compose.yml` (лежит в корне: `db` + `api`, образ Postgres зафиксирован тегом и digest) — проверить `docker compose up --build`: оба сервиса `healthy`, `curl localhost:8080/api/v1/days`; после `docker compose restart` добавленная поездка на месте; `docker compose down -v` возвращает начальные данные
-- [ ] E4 Railway: сервис API из репозитория, Root Directory = `api`; `api/railway.json` — сборка из Dockerfile, `healthcheckPath: /healthz`; рядом — сервис PostgreSQL из шаблона Railway; в API переменная `DATABASE_URL=${{Postgres.DATABASE_URL}}` (внутренняя сеть), плюс `APP_TZ`, `CORS_ALLOWED_ORIGINS`; сверить мажорную версию Postgres на Railway с локальной
+- [x] E1 `api/Dockerfile`, две стадии: сборка на `golang:1.26.8-alpine3.24`, запуск на `distroless/static-debian13` (nonroot); оба базовых образа — точный тег + `@sha256:` (сверить существование тегов при реализации); `CGO_ENABLED=0`, `-trimpath`
+- [x] E2 `api/.dockerignore`
+- [x] E3 `docker-compose.yml` (лежит в корне: `db` + `api`, образ Postgres зафиксирован тегом и digest) — проверить `docker compose up --build`: оба сервиса `healthy`, `curl localhost:8080/api/v1/days`; после `docker compose restart` добавленная поездка на месте; `docker compose down -v` возвращает начальные данные
+- [x] E4 Railway: сервис API из репозитория, Root Directory = `api`; `api/railway.json` — сборка из Dockerfile, `healthcheckPath: /healthz`; рядом — сервис PostgreSQL из шаблона Railway; в API переменная `DATABASE_URL=${{Postgres.DATABASE_URL}}` (внутренняя сеть), плюс `APP_TZ`, `CORS_ALLOWED_ORIGINS`; сверить мажорную версию Postgres на Railway с локальной. **Сделано иначе:** репозитория на GitHub ещё нет, поэтому сервис выкатывается загрузкой каталога — `railway up --service api` из `api/`; Root Directory не задан, `railway.json` подхватывается из корня загрузки. После 0.3 можно подключить репозиторий (тогда Root Directory = `api`, путь к конфигу `/api/railway.json`). `CORS_ALLOWED_ORIGINS=*` — сузить до адреса демо в E5
 - [ ] E5 Демо: `flutter build web --dart-define=API_BASE_URL=<railway-url>` → GitHub Pages; не забыть `--base-href`
 - [ ] E6 CI (GitHub Actions, версии действий и инструментов зафиксированы): `go vet`, `go test -race` с сервисным контейнером Postgres той же версии и `TEST_DATABASE_URL`, `flutter analyze`, `flutter test`
 

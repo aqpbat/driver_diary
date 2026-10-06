@@ -1,0 +1,5 @@
+# Go build artifacts. Kept here, not in the root .gitignore: `railway up` runs
+# from this directory and misreads root-anchored patterns such as /api/server
+# as cmd/server, dropping the sources from the upload.
+/bin/
+/server

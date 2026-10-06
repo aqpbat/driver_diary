@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Driver shift diary" — a take-home test assignment. A server exposes a driver's trips and a per-day summary; a client shows the summary and trip list, switches days, and adds trips.
 
-**Current state: stages 1–2 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; the Dockerfile, `railway.json` and CI do not exist yet, and `mobile/` is the untouched Flutter template. [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed. Under "Backend" below, anything about the Docker image and Railway describes the agreed target, not existing code.
+**Current state: stages 1–3 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; `api/Dockerfile`, `api/.dockerignore` and `api/railway.json` exist, the compose stack is verified, and the API runs on Railway at https://api-production-ab4d.up.railway.app (project `driver-diary`, services `api` and `Postgres`). CI does not exist, and `mobile/` is the untouched Flutter template. [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed.
 
 The user communicates in Russian; README and PLAN are written in Russian.
 
@@ -69,7 +69,8 @@ Rules that span these layers and are easy to get wrong:
 - The API can start before the database is reachable (Railway has no `depends_on`): connect with retries, and `/healthz` pings the DB.
 - Store and duplicate-protection tests run against a real PostgreSQL given by `TEST_DATABASE_URL`, each test in its own schema (`internal/testdb.New(t)` creates it and returns the URL). They skip when it is unset locally and must fail in CI — do not replace them with an in-memory fake.
 - The runtime image is distroless (no shell); the container healthcheck is the binary's own `-healthcheck` flag. `docker-compose.yml` already depends on this and on the binary living at `/server`.
-- Railway: service Root Directory is `api`, the server must bind `0.0.0.0:$PORT`; `DATABASE_URL` references the Railway Postgres service.
+- The image carries the seed at `/data/trips.json` (`TRIPS_FILE` is set in the Dockerfile); compose mounts its own copy over it. `api/.dockerignore` is an allow-list — a new top-level directory under `api/` must be added there and to the Dockerfile's `COPY` lines.
+- Railway: deployed by upload, not from GitHub — `railway up --service api` run from `api/` (the CLI lives at `~/.railway/bin/railway`). Go build artifacts are ignored in `api/.gitignore`, not the root one: the CLI misread the root pattern `/api/server` and dropped `cmd/server` from the upload. If the service is later connected to the GitHub repo, Root Directory is `api` and the config path `/api/railway.json`; the server must bind `0.0.0.0:$PORT`; `DATABASE_URL` references the Railway Postgres service.
 
 ### Mobile (`mobile/`)
 

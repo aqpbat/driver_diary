@@ -11,8 +11,6 @@
 *.iml
 
 # Go build artifacts
-/api/bin/
-/api/server
 *.exe
 *.test
 *.out
