@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Driver shift diary" — a take-home test assignment. A server exposes a driver's trips and a per-day summary; a client shows the summary and trip list, switches days, and adds trips.
 
-**Current state: stage 1 done.** `api/internal/trip` (domain + tests) and `api/data/trips.json` exist; `internal/store`, `internal/httpapi`, `cmd/server` and the Dockerfile do not yet, and `mobile/` is the untouched Flutter template. [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed. Under "Backend" below, anything about the store, HTTP and deployment describes the agreed target, not existing code.
+**Current state: stages 1–2 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; the Dockerfile, `railway.json` and CI do not exist yet, and `mobile/` is the untouched Flutter template. [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed. Under "Backend" below, anything about the Docker image and Railway describes the agreed target, not existing code.
 
 The user communicates in Russian; README and PLAN are written in Russian.
 
@@ -24,13 +24,13 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080    # Android emulato
 flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
-Backend (run from `api/`, once it exists):
+Backend (run from `api/`):
 
 ```sh
 go test -race ./...                                # store tests need TEST_DATABASE_URL, see below
 go test -race ./internal/trip -run TestSummarize   # one test
 go vet ./... && gofmt -l .
-go run ./cmd/server
+DATABASE_URL='postgres://diary:diary@localhost:5432/diary?sslmode=disable' go run ./cmd/server
 ```
 
 Local stack (Postgres + API): `docker compose up --build` from the repo root → `http://localhost:8080`. `docker compose down -v` resets the database to the seed.
@@ -67,7 +67,7 @@ Rules that span these layers and are easy to get wrong:
 - **Idempotency key is the client-supplied `id`.** `POST /api/v1/trips`: new → `201`; same `id` and same content → `200`, nothing written; same `id` with different content → `409`. "Same content" compares time *instants*, so `08:10+05:00` equals `03:10Z`. Atomicity comes from the primary key: `INSERT … ON CONFLICT(id) DO NOTHING`, then read back and compare with `trip.Equal` if nothing was inserted — never check-then-insert.
 - Day boundaries have two implementations that must agree: `trip.DayOf` in Go and `(start_at AT TIME ZONE $1)::date` in SQL. Always pass `APP_TZ` as the parameter — never rely on the session time zone. `TIMESTAMPTZ` stores the instant only, so responses are re-rendered in `APP_TZ`.
 - The API can start before the database is reachable (Railway has no `depends_on`): connect with retries, and `/healthz` pings the DB.
-- Store and duplicate-protection tests run against a real PostgreSQL given by `TEST_DATABASE_URL`, each test in its own schema. They skip when it is unset locally and must fail in CI — do not replace them with an in-memory fake.
+- Store and duplicate-protection tests run against a real PostgreSQL given by `TEST_DATABASE_URL`, each test in its own schema (`internal/testdb.New(t)` creates it and returns the URL). They skip when it is unset locally and must fail in CI — do not replace them with an in-memory fake.
 - The runtime image is distroless (no shell); the container healthcheck is the binary's own `-healthcheck` flag. `docker-compose.yml` already depends on this and on the binary living at `/server`.
 - Railway: service Root Directory is `api`, the server must bind `0.0.0.0:$PORT`; `DATABASE_URL` references the Railway Postgres service.
 

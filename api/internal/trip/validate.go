@@ -2,6 +2,7 @@ package trip
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -21,6 +22,9 @@ func Validate(t Trip) FieldErrors {
 		errs["id"] = "is required"
 	case utf8.RuneCountInString(t.ID) > MaxIDLength:
 		errs["id"] = "must be at most 64 characters"
+	case strings.ContainsFunc(t.ID, unicode.IsControl):
+		// A NUL byte cannot be stored in a PostgreSQL text column at all.
+		errs["id"] = "must not contain control characters"
 	}
 
 	if t.Start.IsZero() {

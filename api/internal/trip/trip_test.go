@@ -84,6 +84,39 @@ func TestDayOfDependsOnLocation(t *testing.T) {
 	}
 }
 
+func TestDayBounds(t *testing.T) {
+	almaty := mustLoc(t, "Asia/Almaty")
+
+	from, to, err := DayBounds("2026-10-01", almaty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := mustTime(t, "2026-10-01T00:00:00+05:00"); !from.Equal(want) {
+		t.Errorf("from = %s, want %s", from, want)
+	}
+	if want := mustTime(t, "2026-10-02T00:00:00+05:00"); !to.Equal(want) {
+		t.Errorf("to = %s, want %s", to, want)
+	}
+
+	// Every trip start must fall inside the bounds of its own day.
+	for _, start := range []string{"2026-10-01T23:55:00+05:00", "2026-10-02T00:05:00+05:00", "2026-10-01T19:00:00Z"} {
+		tr := Trip{Start: mustTime(t, start)}
+		from, to, err := DayBounds(DayOf(tr, almaty), almaty)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tr.Start.Before(from) || !tr.Start.Before(to) {
+			t.Errorf("start %s is outside [%s, %s)", start, from, to)
+		}
+	}
+
+	for _, bad := range []string{"", "2026-10-1", "2026-13-01", "2026-02-30", "01.10.2026", "2026-10-01T00:00:00Z", "today"} {
+		if _, _, err := DayBounds(bad, almaty); err == nil {
+			t.Errorf("DayBounds(%q): want error", bad)
+		}
+	}
+}
+
 func TestEqual(t *testing.T) {
 	base := Trip{
 		ID:         "a",
@@ -166,6 +199,8 @@ func TestValidate(t *testing.T) {
 			FieldErrors{"id": "is required"}},
 		{"id too long", with(func(c *Trip) { c.ID = strings.Repeat("x", 65) }),
 			FieldErrors{"id": "must be at most 64 characters"}},
+		{"id with a NUL byte", with(func(c *Trip) { c.ID = "a\x00b" }),
+			FieldErrors{"id": "must not contain control characters"}},
 
 		{"missing start", with(func(c *Trip) { c.Start = time.Time{} }),
 			FieldErrors{"start": "is required"}},

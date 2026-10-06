@@ -60,3 +60,31 @@ func Equal(a, b Trip) bool {
 		a.Payment == b.Payment &&
 		a.Commission == b.Commission
 }
+
+// DayBounds parses a date such as 2026-10-01 and returns the instants at
+// which that day starts and ends in loc, as the half-open range [from, to).
+func DayBounds(date string, loc *time.Location) (from, to time.Time, err error) {
+	from, err = time.ParseInLocation(dayLayout, date, loc)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid date %q: want YYYY-MM-DD", date)
+	}
+	return from, from.AddDate(0, 0, 1), nil
+}
+
+// DayCount is a day that has trips and how many of them it has.
+type DayCount struct {
+	Date       string `json:"date"`
+	TripsCount int    `json:"trips_count"`
+}
+
+// AddOutcome is what happened when a trip was offered for saving.
+type AddOutcome int
+
+const (
+	// Created: the trip was new and has been saved.
+	Created AddOutcome = iota + 1
+	// Duplicate: the same trip was already saved; nothing was written.
+	Duplicate
+	// Conflict: the id belongs to a different trip; nothing was written.
+	Conflict
+)
