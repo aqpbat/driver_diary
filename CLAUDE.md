@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Driver shift diary" — a take-home test assignment. A server exposes a driver's trips and a per-day summary; a client shows the summary and trip list, switches days, and adds trips.
 
-**Current state: stages 1–3 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; `api/Dockerfile`, `api/.dockerignore` and `api/railway.json` exist, the compose stack is verified, and the API runs on Railway at https://api-production-ab4d.up.railway.app (project `driver-diary`, services `api` and `Postgres`). CI does not exist, and `mobile/` is the untouched Flutter template. [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed.
+**Current state: stages 1–4 done.** The backend (`internal/trip`, `internal/store`, `internal/httpapi`, `cmd/server`) is implemented and tested; `api/Dockerfile`, `api/.dockerignore` and `api/railway.json` exist, the compose stack is verified, and the API runs on Railway at https://api-production-ab4d.up.railway.app (project `driver-diary`, services `api` and `Postgres`). The Flutter client in `mobile/` is implemented and tested (design system, data layer, day screen, add-trip form). Not done yet: the web demo (E5), CI (E6) and the hand-in tasks (J). [PLAN.md](PLAN.md) (in Russian) holds the decisions, the API contract, and the task checklist — read it before implementing anything, and tick its checkboxes as tasks are completed.
 
 The user communicates in Russian; README and PLAN are written in Russian.
 
@@ -20,6 +20,7 @@ flutter analyze
 flutter test                                  # all tests
 flutter test test/path/to_test.dart           # one file
 flutter test --plain-name "substring"         # one test by name
+dart format lib test
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080    # Android emulator
 flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
 ```
@@ -88,7 +89,12 @@ Flutter app targeting Android, iOS and Web (Web doubles as the public demo).
 
 Other constraints:
 
-- **No Material.** The design must be custom: `WidgetsApp` instead of `MaterialApp`, no `package:flutter/material.dart` import anywhere in `lib/`, no `Icons.*`. UI is built from the project's own tokens and components in `lib/core/design/`. The template's `main.dart` and `uses-material-design: true` still violate this and are to be replaced.
-- **Dart's `DateTime.parse` drops the UTC offset** and converts to UTC. Trip times must be displayed in the driver's zone as sent by the server, not the device's zone — keep the wall-clock time from the server string.
+- **No Material.** The design is custom: `WidgetsApp` instead of `MaterialApp`, no `package:flutter/material.dart` import anywhere in `lib/`, no `Icons.*`. UI is built from the project's own tokens and components in `lib/core/design/` (screens import `core/design/design.dart`). Cupertino is allowed only as an engine inside `lib/core/design/` (`CupertinoTextField` with `decoration: null`, `CupertinoSliverRefreshControl`) and for the localizations delegate in `lib/app/app.dart`.
+- **`test/architecture_test.dart` enforces the layer rules** by reading the import lines of every file in `lib/`: no Material, pure-Dart `domain`, `presentation` never imports `data` or `core/network`, features do not import each other. A new shared type goes to `core/`, not into the other feature.
+- The two features meet only in `lib/app/app.dart`: `DayPage` takes an `AddTripLauncher` callback, the app answers it by opening `AddTripSheet`, and the sheet pops with the saved trip's day.
+- **Dart's `DateTime.parse` drops the UTC offset** and converts to UTC. Trip times must be displayed in the driver's zone as sent by the server, not the device's zone — keep the wall-clock time from the server string. That is what `core/domain/zoned_time.dart` (`ZonedTime`) is for; never put a trip time into a `DateTime` for display.
+- The form sends times with the offset from `--dart-define=DRIVER_UTC_OFFSET` (default `+05:00`), which must match the server's `APP_TZ`; "today" is computed on that clock too, never from the device zone.
+- The summary is shown as the server computed it; the client never recomputes it from the trip list.
+- Widget tests must not use `pumpAndSettle` on screens with a `Skeleton` or `AppSpinner` (they animate forever) — pump a fixed duration. The test font is much wider than Onest, and `SliverList` builds only what fits the viewport, so set `tester.view.physicalSize` before looking for list items.
 - `AddTripCubit` generates the trip `id` once in its constructor and reuses it on every retry; regenerating it on retry defeats the server's duplicate protection.
 - API base URL comes from `--dart-define=API_BASE_URL`. The Android emulator reaches the host at `10.0.2.2`; cleartext HTTP is allowed in the debug manifest only.

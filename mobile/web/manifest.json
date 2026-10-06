@@ -1,11 +1,11 @@
 {
-    "name": "driver_app_demo",
-    "short_name": "driver_app_demo",
+    "name": "Дневник смен",
+    "short_name": "Дневник смен",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F3F1EA",
+    "theme_color": "#FFC935",
+    "description": "Дневник смен водителя: сводка за день и список поездок.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app is a client of the diary API; release builds need this too. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="driver_app_demo"
+        android:label="Дневник смен"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

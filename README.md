@@ -2,7 +2,7 @@
 
 Тестовое задание: сервер отдаёт поездки водителя и сводку за день, клиент показывает сводку и список поездок, переключает дни и добавляет поездки.
 
-**Состояние:** готов бэкенд — домен, хранилище на PostgreSQL и HTTP API, всё с тестами, — и его Docker-образ. API развёрнут на Railway: https://api-production-ab4d.up.railway.app (например, [`/api/v1/days`](https://api-production-ab4d.up.railway.app/api/v1/days)). Клиент — в работе, план и чеклист — в [PLAN.md](PLAN.md).
+**Состояние:** готовы сервер (домен, хранилище на PostgreSQL, HTTP API, Docker-образ) и клиент на Flutter (Android, iOS, Web) — всё с тестами. API развёрнут на Railway: https://api-production-ab4d.up.railway.app (например, [`/api/v1/days`](https://api-production-ab4d.up.railway.app/api/v1/days)). Впереди — демо-сборка клиента и CI; план и чеклист — в [PLAN.md](PLAN.md).
 
 ## Запуск сервера
 
@@ -33,6 +33,32 @@ DATABASE_URL='postgres://diary:diary@localhost:5432/diary?sslmode=disable' go ru
 | `TRIPS_FILE` | `data/trips.json` | начальные данные для пустой базы |
 | `CORS_ALLOWED_ORIGINS` | пусто (CORS выключен) | разрешённые источники через запятую или `*` |
 
+## Запуск клиента
+
+Нужен Flutter 3.47.5. Клиент ходит в API по адресу из `API_BASE_URL` (по умолчанию `http://localhost:8080`), поэтому сначала поднимите сервер: `docker compose up --build`.
+
+```sh
+cd mobile
+flutter pub get
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080      # браузер
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080                 # эмулятор Android
+flutter run --dart-define=API_BASE_URL=http://localhost:8080                # симулятор iOS
+flutter run --dart-define=API_BASE_URL=https://api-production-ab4d.up.railway.app   # сервер на Railway
+```
+
+| Параметр `--dart-define` | По умолчанию | Смысл |
+|---|---|---|
+| `API_BASE_URL` | `http://localhost:8080` | адрес API |
+| `DRIVER_UTC_OFFSET` | `+05:00` | смещение часов водителя; должно совпадать с `APP_TZ` сервера. С ним форма отправляет время поездки, по нему считается «сегодня» — часы устройства не используются |
+
+В VS Code то же самое доступно из панели «Run and Debug»: готовые конфигурации запуска лежат в [.vscode/launch.json](.vscode/launch.json) — клиент в Chrome, на эмуляторе Android и симуляторе iOS с локальным API, клиент с сервером на Railway (локальный сервер не нужен) и сам сервер под отладчиком Go.
+
+Открытый HTTP разрешён только для разработки: на Android — в debug-манифесте, на iOS — только к локальной сети (`NSAllowsLocalNetworking`).
+
+Экран компонентов дизайн-системы открывается долгим нажатием на заголовок с датой — только в debug-сборке.
+
+Клиент устроен по Clean Architecture с делением по фичам и `flutter_bloc`, без Material: правила — в [PLAN.md](PLAN.md), раздел 3.1; их соблюдение проверяет `mobile/test/architecture_test.dart`.
+
 ## Тесты
 
 ```sh
@@ -43,6 +69,16 @@ go vet ./... && gofmt -l .
 ```
 
 Тесты хранилища и защиты от дублей идут на настоящем PostgreSQL, каждый — в своей временной схеме, рабочие данные не затрагиваются. Без `TEST_DATABASE_URL` они пропускаются (в CI — падают), остаются только тесты домена.
+
+Клиент:
+
+```sh
+cd mobile
+flutter analyze
+flutter test
+```
+
+Тестам клиента сервер не нужен: сеть подменяется на уровне HTTP-клиента, Bloc проверяются с подставными use case'ами.
 
 ## Контракт API
 
