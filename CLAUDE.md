@@ -27,17 +27,25 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
 Backend (run from `api/`, once it exists):
 
 ```sh
-go test -race ./...
+go test -race ./...                                # store tests need TEST_DATABASE_URL, see below
 go test -race ./internal/trip -run TestSummarize   # one test
 go vet ./... && gofmt -l .
 go run ./cmd/server
 ```
 
-Local server: `docker compose up --build` from the repo root → `http://localhost:8080`.
+Local stack (Postgres + API): `docker compose up --build` from the repo root → `http://localhost:8080`. `docker compose down -v` resets the database to the seed.
+
+Tests that touch the database:
+
+```sh
+docker compose up -d db
+TEST_DATABASE_URL='postgres://diary:diary@localhost:5432/diary?sslmode=disable' go test -race ./...
+```
 
 ## Toolchain — versions are pinned on purpose
 
-- Go **1.26.8** (`go.mod`: `go 1.26` + `toolchain go1.26.8`). Standard library only — do not add third-party Go modules.
+- Go **1.26.8** (`go.mod`: `go 1.26` + `toolchain go1.26.8`). Standard library plus exactly one module, the PostgreSQL driver `github.com/jackc/pgx/v5` (pure Go — the build stays `CGO_ENABLED=0`). Do not add other Go modules: no router, no ORM, no migration tool, no testcontainers.
+- PostgreSQL **18.6** (`postgres:18.6-alpine3.24`, pinned by digest in `docker-compose.yml`; CI must use the same image).
 - Flutter **3.47.5** / Dart **3.13.4**. Dart dependencies use exact versions (no `^`); `pubspec.lock` is committed.
 - Docker base images: exact tag plus `@sha256:` digest.
 - Node and a modern Python are not installed on this machine.
@@ -48,25 +56,38 @@ Local server: `docker compose up --build` from the repo root → `http://localho
 
 Three layers, dependencies point inward:
 
-- `internal/trip` — model, validation, summary calculation. Pure functions, no HTTP, no I/O. This is where the assignment's required tests live.
-- `internal/store` — in-memory map behind a mutex, seeded from `data/trips.json` at startup. No database, by requirement; added trips are lost on restart.
+- `internal/trip` — model, validation, summary calculation. Pure functions, no HTTP, no I/O, no SQL. This is where the assignment's required tests live.
+- `internal/store` — PostgreSQL via `pgxpool` (`DATABASE_URL`). Embedded SQL migrations run at startup under `pg_advisory_lock`; `data/trips.json` is seeded only when the table is empty. HTTP handlers depend on a store interface, not on `pgx`.
 - `internal/httpapi` — routes on the stdlib `ServeMux`, CORS, the single error envelope.
 
 Rules that span these layers and are easy to get wrong:
 
 - **Money is integers.** Never `float`.
 - **A trip's "day" is the local date of its `start` in `APP_TZ`** (default `Asia/Almaty`), not the offset the client sent and not UTC. The server needs `import _ "time/tzdata"` because the runtime image has no zoneinfo.
-- **Idempotency key is the client-supplied `id`.** `POST /api/v1/trips`: new → `201`; same `id` and same content → `200`, nothing written; same `id` with different content → `409`. "Same content" compares time *instants*, so `08:10+05:00` equals `03:10Z`. The lookup and the insert must happen under one lock.
-- **Single replica only** on Railway — state is in process memory, so a second replica breaks duplicate protection.
+- **Idempotency key is the client-supplied `id`.** `POST /api/v1/trips`: new → `201`; same `id` and same content → `200`, nothing written; same `id` with different content → `409`. "Same content" compares time *instants*, so `08:10+05:00` equals `03:10Z`. Atomicity comes from the primary key: `INSERT … ON CONFLICT(id) DO NOTHING`, then read back and compare with `trip.Equal` if nothing was inserted — never check-then-insert.
+- Day boundaries have two implementations that must agree: `trip.DayOf` in Go and `(start_at AT TIME ZONE $1)::date` in SQL. Always pass `APP_TZ` as the parameter — never rely on the session time zone. `TIMESTAMPTZ` stores the instant only, so responses are re-rendered in `APP_TZ`.
+- The API can start before the database is reachable (Railway has no `depends_on`): connect with retries, and `/healthz` pings the DB.
+- Store and duplicate-protection tests run against a real PostgreSQL given by `TEST_DATABASE_URL`, each test in its own schema. They skip when it is unset locally and must fail in CI — do not replace them with an in-memory fake.
 - The runtime image is distroless (no shell); the container healthcheck is the binary's own `-healthcheck` flag. `docker-compose.yml` already depends on this and on the binary living at `/server`.
-- Railway: service Root Directory is `api`, the server must bind `0.0.0.0:$PORT`.
+- Railway: service Root Directory is `api`, the server must bind `0.0.0.0:$PORT`; `DATABASE_URL` references the Railway Postgres service.
 
 ### Mobile (`mobile/`)
 
 Flutter app targeting Android, iOS and Web (Web doubles as the public demo).
 
-- **No Material.** The design must be custom: `WidgetsApp` instead of `MaterialApp`, no `package:flutter/material.dart` import anywhere in `lib/`, no `Icons.*`. UI is built from the project's own tokens and components in `lib/design/`. The template's `main.dart` and `uses-material-design: true` still violate this and are to be replaced.
+**Feature-first Clean Architecture with `flutter_bloc`.** Layout and the full rule list are in PLAN.md §3.1; the parts that are easy to violate:
+
+- `lib/features/<feature>/{domain,data,presentation}`, shared code in `lib/core/`, wiring in `lib/app/`.
+- Dependencies point to `domain`. `domain` is pure Dart: no `flutter`, `http`, `bloc` or JSON. `presentation` never imports `data`.
+- Widget → Bloc/Cubit → use case → repository interface. Widgets do not call repositories; Blocs do not see HTTP or DTOs.
+- Features do not import each other; anything shared (the `Trip` entity, `Failure`/`Result`, the API client, the design system) lives in `core/`.
+- Exceptions stop at the `data` layer: repositories return `Result<T>` with a `Failure`. `Result` is the project's own sealed class — no `dartz`/`fpdart`.
+- Dependencies are constructed once in `app/` and passed by constructor and `RepositoryProvider`/`BlocProvider`. No `get_it`, no global singletons.
+- Bloc states and events are sealed classes with `Equatable`. Blocs are tested with `bloc_test` + `mocktail`.
+
+Other constraints:
+
+- **No Material.** The design must be custom: `WidgetsApp` instead of `MaterialApp`, no `package:flutter/material.dart` import anywhere in `lib/`, no `Icons.*`. UI is built from the project's own tokens and components in `lib/core/design/`. The template's `main.dart` and `uses-material-design: true` still violate this and are to be replaced.
 - **Dart's `DateTime.parse` drops the UTC offset** and converts to UTC. Trip times must be displayed in the driver's zone as sent by the server, not the device's zone — keep the wall-clock time from the server string.
-- The trip form generates its `id` once when opened and reuses it on every retry; regenerating it on retry defeats the server's duplicate protection.
+- `AddTripCubit` generates the trip `id` once in its constructor and reuses it on every retry; regenerating it on retry defeats the server's duplicate protection.
 - API base URL comes from `--dart-define=API_BASE_URL`. The Android emulator reaches the host at `10.0.2.2`; cleartext HTTP is allowed in the debug manifest only.
-- State is plain `ChangeNotifier`; no state-management packages.
